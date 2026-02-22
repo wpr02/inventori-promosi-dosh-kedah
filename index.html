@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Inventori DOSH Kedah</title>
+    <style>
+        :root { 
+            --primary: #003366; 
+            --accent: #27ae60; 
+            --admin-color: #8e44ad; 
+            --danger: #e74c3c;
+            --bg: #f4f7f6; 
+        }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background: var(--bg); 
+            padding: 20px; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+        }
+        .container { 
+            background: white; 
+            padding: 30px; 
+            border-radius: 20px; 
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1); 
+            width: 100%; 
+            max-width: 480px; 
+        }
+        .header { text-align: center; cursor: pointer; margin-bottom: 20px; }
+        .logo-text { color: var(--primary); font-size: 26px; font-weight: 800; margin: 0; }
+        .sub-text { color: #666; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; }
+        
+        #displayClock { 
+            margin-top: 10px; 
+            padding: 5px;
+            background: #eee;
+            border-radius: 5px;
+            font-weight: bold; 
+            color: #444; 
+            font-size: 13px; 
+        }
+
+        .alert-box { 
+            width: 100%; max-width: 480px; margin-bottom: 15px; display: none;
+            background: #fff5f5; border-left: 5px solid var(--danger);
+            padding: 15px; border-radius: 10px; box-sizing: border-box;
+        }
+        .alert-box h4 { margin: 0 0 5px 0; color: var(--danger); font-size: 14px; }
+        #lowStockList { margin: 0; padding-left: 20px; font-size: 13px; color: #333; }
+
+        label { display: block; margin: 15px 0 5px; font-weight: bold; color: var(--primary); font-size: 14px; }
+        select, input { 
+            width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 10px; 
+            box-sizing: border-box; margin-bottom: 10px; font-size: 15px; outline: none;
+        }
+        select:focus, input:focus { border-color: var(--primary); }
+
+        button { 
+            width: 100%; padding: 15px; border: none; border-radius: 10px; 
+            color: white; font-weight: bold; cursor: pointer; font-size: 16px; 
+            transition: all 0.3s; margin-top: 10px;
+        }
+        .btn-user { background: var(--accent); box-shadow: 0 4px 10px rgba(39, 174, 96, 0.3); }
+        .btn-user:hover { background: #219150; transform: translateY(-2px); }
+        
+        #adminPanel { 
+            display: none; background: #fef9ff; padding: 20px; border-radius: 15px; 
+            margin-top: 25px; border: 2px dashed var(--admin-color); 
+        }
+        .btn-admin { background: var(--admin-color); }
+
+        #status { text-align: center; font-size: 12px; margin-top: 20px; color: #7f8c8d; }
+    </style>
+</head>
+<body>
+
+    <div id="alertBox" class="alert-box">
+        <h4>⚠️ PESANAN: STOK PERLU DITAMBAH</h4>
+        <ul id="lowStockList"></ul>
+    </div>
+
+    <div class="container">
+        <div class="header" onclick="toggleAdmin()">
+            <div class="logo-text">DOSH KEDAH</div>
+            <div class="sub-text">Sistem Stok Barang Promosi</div>
+            <div id="displayClock">Memuatkan masa...</div>
+        </div>
+
+        <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+
+        <div id="userForm">
+            <label>Nama Pengambil:</label>
+            <select id="userName"><option>Sila tunggu...</option></select>
+
+            <label>Seksyen:</label>
+            <select id="userSection"><option>Sila tunggu...</option></select>
+
+            <label>Pilih Barang:</label>
+            <select id="itemSelect"><option>Sila tunggu...</option></select>
+
+            <label>Kuantiti Diambil:</label>
+            <input type="number" id="qty" value="1" min="1">
+
+            <button class="btn-user" id="btnUser" onclick="prosesStok('tolak')">REKOD PENGAMBILAN</button>
+        </div>
+
+        <div id="adminPanel">
+            <h3 style="color: var(--admin-color); margin-top: 0; text-align: center;">🔐 Mod Admin</h3>
+            <label>Barang untuk Restock:</label>
+            <select id="itemSelectAdmin"></select>
+            <label>Kuantiti Masuk:</label>
+            <input type="number" id="qtyAdmin" value="10" min="1">
+            <button class="btn-admin" id="btnAdmin" onclick="prosesStok('tambah')">KEMASKINI TAMBAH STOK</button>
+            <p style="font-size: 11px; color: #888; text-align: center; margin-top: 10px;">*Tutup Mod Admin dengan muat semula (refresh) halaman.</p>
+        </div>
+
+        <div id="status">Sistem sedia digunakan.</div>
+    </div>
+
+    <script>
+        // === KONFIGURASI ===
+        const API_URL = "https://script.google.com/macros/s/AKfycbxm2ksCozqkPZxbzezWRlHn8_m1RuAhkCxa6Mxm1MwWIoErzSI2iCmyFYIdioVITW-m/exec";
+        const ADMIN_PASS = "1234"; // Ganti kata laluan pilihan anda
+        const LIMIT_MINIMUM = 5;   // Amaran jika stok 5 atau kurang
+
+        // 1. FUNGSI JAM & TARIKH
+        function updateClock() {
+            const paparan = document.getElementById('displayClock');
+            const kini = new Date();
+            const hari = ["Ahad", "Isnin", "Selasa", "Rabu", "Khamis", "Jumaat", "Sabtu"];
+            const bulan = ["Januari", "Februari", "Mac", "April", "Mei", "Jun", "Julai", "Ogos", "September", "Oktober", "November", "Disember"];
+            
+            const jam = kini.getHours().toString().padStart(2, '0');
+            const minit = kini.getMinutes().toString().padStart(2, '0');
+            const saat = kini.getSeconds().toString().padStart(2, '0');
+
+            paparan.innerHTML = `${hari[kini.getDay()]}, ${kini.getDate()} ${bulan[kini.getMonth()]} ${kini.getFullYear()} | ${jam}:${minit}:${saat}`;
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // 2. AMBIL DATA DARI GOOGLE SHEETS
+        async function loadData() {
+            try {
+                const response = await fetch(API_URL);
+                const res = await response.json();
+
+                // Isi Dropdown Nama
+                const nameSelect = document.getElementById('userName');
+                nameSelect.innerHTML = '<option value="">-- Pilih Nama --</option>';
+                res.kakitangan.forEach(n => nameSelect.add(new Option(n, n)));
+
+                // Isi Dropdown Seksyen
+                const sectionSelect = document.getElementById('userSection');
+                sectionSelect.innerHTML = '<option value="">-- Pilih Seksyen --</option>';
+                res.seksyen.forEach(s => sectionSelect.add(new Option(s, s)));
+
+                // Isi Dropdown Barang & Check Stok Rendah
+                const itemSelect = document.getElementById('itemSelect');
+                const itemSelectAdmin = document.getElementById('itemSelectAdmin');
+                const lowStockList = document.getElementById('lowStockList');
+                const alertBox = document.getElementById('alertBox');
+
+                itemSelect.innerHTML = '<option value="">-- Pilih Barang --</option>';
+                itemSelectAdmin.innerHTML = '<option value="">-- Pilih Barang --</option>';
+                
+                let lowItems = [];
+
+                res.stok.slice(1).forEach(row => {
+                    const nama = row[1];
+                    const baki = parseInt(row[2]);
+                    if(nama) {
+                        itemSelect.add(new Option(`${nama} (Baki: ${baki})`, nama));
+                        itemSelectAdmin.add(new Option(nama, nama));
+                        
+                        if(baki <= LIMIT_MINIMUM) {
+                            lowItems.push(`<li><strong>${nama}</strong>: Baki semasa ${baki}</li>`);
+                        }
+                    }
+                });
+
+                if(lowItems.length > 0) {
+                    lowStockList.innerHTML = lowItems.join('');
+                    alertBox.style.display = 'block';
+                }
+
+                document.getElementById('status').innerText = "Data terakhir dikemaskini: " + new Date().toLocaleTimeString();
+            } catch (e) {
+                document.getElementById('status').innerText = "❌ Ralat sambungan data!";
+            }
+        }
+
+        // 3. AKTIFKAN MOD ADMIN
+        function toggleAdmin() {
+            const promptPass = prompt("Sila masukkan Kata Laluan Admin:");
+            if(promptPass === ADMIN_PASS) {
+                document.getElementById('adminPanel').style.display = 'block';
+                document.getElementById('userForm').style.opacity = '0.3';
+                document.getElementById('userForm').style.pointerEvents = 'none';
+                alert("Mod Admin diaktifkan.");
+            } else if (promptPass !== null) {
+                alert("Kata laluan salah!");
+            }
+        }
+
+        // 4. PROSES HANTAR DATA (TAMBAH/TOLAK)
+        async function prosesStok(jenis) {
+            const submitBtn = jenis === 'tambah' ? document.getElementById('btnAdmin') : document.getElementById('btnUser');
+            const payload = {
+                type: jenis,
+                userName: jenis === 'tambah' ? 'ADMIN' : document.getElementById('userName').value,
+                userSection: jenis === 'tambah' ? 'PENGURUSAN' : document.getElementById('userSection').value,
+                itemName: document.getElementById(jenis === 'tambah' ? 'itemSelectAdmin' : 'itemSelect').value,
+                quantity: document.getElementById(jenis === 'tambah' ? 'qtyAdmin' : 'qty').value
+            };
+
+            if(!payload.itemName || !payload.quantity || (jenis === 'tolak' && !payload.userName)) {
+                alert("Sila lengkapkan semua maklumat!");
+                return;
+            }
+
+            submitBtn.disabled = true;
+            document.getElementById('status').innerText = "Sedang memproses rekod...";
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: "POST",
+                    body: JSON.stringify(payload)
+                });
+                alert("✅ Berjaya! Rekod inventori telah dikemaskini.");
+                location.reload();
+            } catch (e) {
+                alert("❌ Gagal menghubungi server.");
+                submitBtn.disabled = false;
+            }
+        }
+
+        loadData();
+    </script>
+</body>
+</html>
