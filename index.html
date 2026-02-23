@@ -86,7 +86,7 @@
                     if(row[1]) {
                         itemSelect.add(new Option(`${row[1]} (Baki: ${row[2]})`, row[1]));
                         itemAdmin.add(new Option(row[1], row[1]));
-                        if(row[2] <= 5) low.push(`<li>${row[1]} (Baki: ${row[2]})</li>`);
+                        if(row[2] <= 2) low.push(`<li>${row[1]} (Baki: ${row[2]})</li>`);
                     }
                 });
                 if(low.length > 0) {
@@ -137,5 +137,6 @@
     </script>
 </body>
 </html>
+
 
 
