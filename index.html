@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistem Inventori DOSH Kedah</title>
+    <title>Sistem Inventori Promosi DOSH Kedah</title>
     <style>
         :root { --primary: #003366; --accent: #27ae60; --admin: #8e44ad; --bg: #f4f7f6; }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); padding: 20px; display: flex; flex-direction: column; align-items: center; }
@@ -60,6 +60,7 @@
     </div>
 
     <script>
+        // Masukkan URL API Google Apps Script anda di bawah
         const API_URL = "https://script.google.com/macros/s/AKfycbwIn3DpwnZdtgfbV6rjsZNU8iJ5G22CFlbaojG1sfP-Tdf8Pqp2IZW7qc3N_3qcM9y9/exec";
         const ADMIN_PASS = "1234"; 
 
@@ -86,6 +87,7 @@
                     if(row[1]) {
                         itemSelect.add(new Option(`${row[1]} (Baki: ${row[2]})`, row[1]));
                         itemAdmin.add(new Option(row[1], row[1]));
+                        // Kemaskini baki amaran kepada 2 unit atau kurang
                         if(row[2] <= 2) low.push(`<li>${row[1]} (Baki: ${row[2]})</li>`);
                     }
                 });
@@ -137,6 +139,3 @@
     </script>
 </body>
 </html>
-
-
-
