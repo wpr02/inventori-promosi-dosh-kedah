@@ -21,7 +21,6 @@
         .btn-user { background: var(--accent); }
         #adminPanel { display: none; background: #fef9ff; padding: 20px; border-radius: 15px; margin-top: 25px; border: 2px dashed var(--admin); }
         
-        /* Gaya baru untuk bahagian muat turun */
         .download-box { background: #fff; border: 1px solid #ddd; padding: 15px; border-radius: 10px; margin-top: 10px; }
         .btn-download { background: #e67e22; }
     </style>
@@ -89,8 +88,7 @@
                         <option value="10">November</option>
                         <option value="11">Disember</option>
                     </select>
-                    <select id="selYear" style="padding: 8px;">
-                        </select>
+                    <select id="selYear" style="padding: 8px;"></select>
                 </div>
                 <button class="btn-download" onclick="muatTurunLaporanCustom()">MUAT TURUN CSV</button>
             </div>
@@ -99,7 +97,8 @@
     </div>
 
     <script>
-        const API_URL = "MASUKKAN_URL_WEB_APP_ANDA_DI_SINI";
+        // GANTIKAN URL DI BAWAH DENGAN URL WEB APP TERKINI ANDA
+        const API_URL = "https://script.google.com/macros/s/AKfycbwR56IldN-_qpB7GvOqFWkQwd2O40zuW5VhmhC_uLn2yGLhCVquONmrn3o2yZBVrAb2/exec";
         const ADMIN_PASS = "1234"; 
         let dataStokGlobal = [];
         let dataLogGlobal = [];
@@ -110,14 +109,12 @@
         }
         setInterval(updateClock, 1000);
 
-        // Fungsi Isi Tahun Dinamik
         function setupYearSelect() {
             const yearSelect = document.getElementById('selYear');
             const currentYear = new Date().getFullYear();
             for(let i = currentYear; i >= 2024; i--) {
                 yearSelect.add(new Option(i, i));
             }
-            // Set default kepada bulan & tahun semasa
             document.getElementById('selMonth').value = new Date().getMonth();
         }
 
@@ -142,7 +139,6 @@
                     }
                 });
                 
-                // Semakan Stok Rendah
                 let low = res.stok.slice(1).filter(r => r[2] <= 2 && r[1]);
                 if(low.length > 0) {
                     document.getElementById('alertBox').style.display = 'block';
@@ -151,7 +147,6 @@
             } catch (e) { document.getElementById('status').innerText = "Ralat data!"; }
         }
 
-        // FUNGSI MUAT TURUN CSV DENGAN PILIHAN TARIKH
         function muatTurunLaporanCustom() {
             if (dataLogGlobal.length <= 1) return alert("Tiada data log ditemui.");
             
@@ -159,7 +154,15 @@
             const targetYear = parseInt(document.getElementById('selYear').value);
             
             let filteredLogs = dataLogGlobal.slice(1).filter(row => {
-                const d = new Date(row[0]);
+                // Logik pembersihan tarikh untuk menyokong format PG/PTG
+                let rawDateStr = row[0].toString().replace(/PG/gi, 'AM').replace(/PTG/gi, 'PM');
+                let d = new Date(rawDateStr);
+                
+                // Jika masih Invalid Date, ambil bahagian tarikh sahaja sebelum koma
+                if (isNaN(d.getTime())) {
+                    d = new Date(row[0].toString().split(',')[0]);
+                }
+                
                 return d.getMonth() === targetMonth && d.getFullYear() === targetYear;
             });
 
@@ -167,11 +170,7 @@
 
             let csvContent = "data:text/csv;charset=utf-8,Tarikh,Nama,Seksyen,Barang,Kuantiti,Baki Asal,Baki Baru\n";
             filteredLogs.forEach(row => {
-                // Formatkan tarikh dalam CSV supaya lebih kemas
-                const dateObj = new Date(row[0]);
-                const dStr = `"${dateObj.toLocaleDateString('ms-MY')} ${dateObj.toLocaleTimeString('ms-MY')}"`;
-                const newRow = [dStr, ...row.slice(1)];
-                csvContent += newRow.join(",") + "\n";
+                csvContent += row.join(",") + "\n";
             });
 
             const encodedUri = encodeURI(csvContent);
