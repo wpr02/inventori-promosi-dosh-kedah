@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistem Inventori Promosi DOSH Kedah</title>
+    <title>Sistem Inventori DOSH Kedah</title>
     <style>
         :root { --primary: #003366; --accent: #27ae60; --admin: #8e44ad; --bg: #f4f7f6; }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); padding: 20px; display: flex; flex-direction: column; align-items: center; }
@@ -11,18 +11,23 @@
         .header { text-align: center; cursor: pointer; margin-bottom: 15px; }
         #clock { background: #eee; padding: 8px; border-radius: 8px; font-weight: bold; font-size: 13px; margin: 10px 0; text-align: center; }
         .alert { background: #fff5f5; border-left: 5px solid #e74c3c; padding: 15px; border-radius: 10px; margin-bottom: 15px; display: none; width: 100%; max-width: 480px; box-sizing: border-box; }
+        
+        #imageContainer { width: 100%; text-align: center; margin: 15px 0; display: none; min-height: 160px; }
+        #itemImage { max-width: 180px; max-height: 180px; border-radius: 12px; border: 3px solid #eee; padding: 5px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); background: #fff; object-fit: contain; }
+
         label { display: block; margin: 15px 0 5px; font-weight: bold; color: var(--primary); font-size: 14px; }
         select, input { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 10px; margin-bottom: 10px; box-sizing: border-box; }
-        button { width: 100%; padding: 15px; border: none; border-radius: 10px; color: white; font-weight: bold; cursor: pointer; font-size: 16px; margin-top: 10px; }
+        button { width: 100%; padding: 15px; border: none; border-radius: 10px; color: white; font-weight: bold; cursor: pointer; font-size: 16px; margin-top: 10px; transition: 0.3s; }
         .btn-user { background: var(--accent); }
-        .btn-admin { background: var(--admin); margin-top: 5px; }
+        .btn-user:hover { background: #219150; }
         #adminPanel { display: none; background: #fef9ff; padding: 20px; border-radius: 15px; margin-top: 25px; border: 2px dashed var(--admin); }
+        .btn-download { background: #e67e22; margin-top: 10px; }
     </style>
 </head>
 <body>
 
     <div id="alertBox" class="alert">
-        <h4 style="margin:0; color:#e74c3c;">⚠️ STOK RENDAH:</h4>
+        <h4 style="margin:0; color:#e74c3c;">⚠️ STOK RENDAH (<=2):</h4>
         <ul id="lowStockList" style="margin:5px 0; font-size:13px;"></ul>
     </div>
 
@@ -35,10 +40,17 @@
         <div id="userForm">
             <label>Nama Pengambil:</label>
             <select id="userName"><option>Sila tunggu...</option></select>
+            
             <label>Seksyen:</label>
             <select id="userSection"><option>Sila tunggu...</option></select>
+            
             <label>Pilih Barang:</label>
-            <select id="itemSelect"><option>Sila tunggu...</option></select>
+            <select id="itemSelect" onchange="tukarGambar()"><option>Sila tunggu...</option></select>
+
+            <div id="imageContainer">
+                <img id="itemImage" src="" alt="Pratonton Barang">
+            </div>
+
             <label>Kuantiti Ambil:</label>
             <input type="number" id="qty" value="1" min="1">
             <button class="btn-user" id="btnUser" onclick="prosesStok('tolak')">REKOD PENGAMBILAN</button>
@@ -50,31 +62,35 @@
             <select id="itemAdmin"></select>
             <label>Kuantiti Masuk:</label>
             <input type="number" id="qtyAdmin" value="10">
-            <button class="btn-admin" onclick="prosesStok('tambah')">TAMBAH STOK</button>
+            <button onclick="prosesStok('tambah')" style="background:var(--admin)">TAMBAH STOK</button>
             <hr>
-            <label>Emel Laporan Analisa:</label>
+            <label>Laporan Bulanan:</label>
             <input type="email" id="adminEmail" placeholder="nama@dosh.gov.my">
-            <button onclick="janaLaporan()" style="background:#34495e;">HANTAR LAPORAN KE EMEL</button>
+            <button onclick="janaLaporan()" style="background:#34495e;">HANTAR KE EMEL</button>
+            <button class="btn-download" onclick="muatTurunLaporan()">MUAT TURUN CSV (BULAN INI)</button>
         </div>
         <div id="status" style="text-align:center; font-size:12px; margin-top:15px; color:#888;">Sedia.</div>
     </div>
 
     <script>
-        // Masukkan URL API Google Apps Script anda di bawah
         const API_URL = "https://script.google.com/macros/s/AKfycbwIn3DpwnZdtgfbV6rjsZNU8iJ5G22CFlbaojG1sfP-Tdf8Pqp2IZW7qc3N_3qcM9y9/exec";
         const ADMIN_PASS = "1234"; 
+        let dataStokGlobal = [];
+        let dataLogGlobal = [];
 
         function updateClock() {
             const kini = new Date();
-            const hari = ["Ahad", "Isnin", "Selasa", "Rabu", "Khamis", "Jumaat", "Sabtu"];
-            const bulan = ["Jan", "Feb", "Mac", "Apr", "Mei", "Jun", "Jul", "Ogs", "Sep", "Okt", "Nov", "Dis"];
-            document.getElementById('clock').innerHTML = `${hari[kini.getDay()]}, ${kini.getDate()} ${bulan[kini.getMonth()]} ${kini.getFullYear()} | ${kini.toLocaleTimeString()}`;
+            document.getElementById('clock').innerHTML = kini.toLocaleString('ms-MY', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
         }
         setInterval(updateClock, 1000);
 
         async function loadData() {
             try {
                 const res = await (await fetch(API_URL)).json();
+                dataStokGlobal = res.stok;
+                // Ambil data log jika tersedia untuk muat turun (perlu kemas kini doGet di Apps Script jika belum ada)
+                dataLogGlobal = res.log || []; 
+                
                 isiSelect('userName', res.kakitangan);
                 isiSelect('userSection', res.seksyen);
                 
@@ -87,7 +103,6 @@
                     if(row[1]) {
                         itemSelect.add(new Option(`${row[1]} (Baki: ${row[2]})`, row[1]));
                         itemAdmin.add(new Option(row[1], row[1]));
-                        // Kemaskini baki amaran kepada 2 unit atau kurang
                         if(row[2] <= 2) low.push(`<li>${row[1]} (Baki: ${row[2]})</li>`);
                     }
                 });
@@ -98,6 +113,26 @@
             } catch (e) { document.getElementById('status').innerText = "Ralat data!"; }
         }
 
+        function tukarGambar() {
+            const selectedItem = document.getElementById('itemSelect').value;
+            const imgContainer = document.getElementById('imageContainer');
+            const imgTag = document.getElementById('itemImage');
+            const itemFound = dataStokGlobal.find(row => row[1] === selectedItem);
+            
+            if (itemFound && itemFound[3] && itemFound[3] !== "") { 
+                let rawLink = itemFound[3];
+                let finalLink = rawLink;
+                if(rawLink.includes("drive.google.com")) {
+                    const fileId = rawLink.split('/d/')[1].split('/')[0];
+                    finalLink = `https://drive.google.com/uc?export=view&id=${fileId}`;
+                }
+                imgTag.src = finalLink;
+                imgContainer.style.display = 'block';
+            } else {
+                imgContainer.style.display = 'none';
+            }
+        }
+
         function isiSelect(id, data) {
             const el = document.getElementById(id);
             el.innerHTML = '<option value="">-- Pilih --</option>';
@@ -106,6 +141,43 @@
 
         function toggleAdmin() {
             if(prompt("Katalaluan Admin:") === ADMIN_PASS) document.getElementById('adminPanel').style.display = 'block';
+        }
+
+        async function muatTurunLaporan() {
+            if (dataLogGlobal.length === 0) {
+                alert("Tiada data log ditemui atau Apps Script belum dikemaskini untuk menghantar data Log.");
+                return;
+            }
+            
+            const kini = new Date();
+            const bulan = kini.getMonth();
+            const tahun = kini.getFullYear();
+            
+            let csvContent = "data:text/csv;charset=utf-8,Tarikh,Nama,Seksyen,Barang,Kuantiti,Baki Asal,Baki Baru\n";
+            
+            dataLogGlobal.slice(1).forEach(row => {
+                const tarikhLog = new Date(row[0]);
+                if (tarikhLog.getMonth() === bulan && tarikhLog.getFullYear() === tahun) {
+                    csvContent += row.join(",") + "\n";
+                }
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `Laporan_Stok_${bulan+1}_${tahun}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        async function hantarData(data) {
+            document.getElementById('status').innerText = "Memproses...";
+            try {
+                const r = await fetch(API_URL, { method: "POST", body: JSON.stringify(data) });
+                alert(await r.text());
+                location.reload();
+            } catch (e) { alert("Gagal menghubungi server!"); }
         }
 
         async function prosesStok(jenis) {
@@ -124,15 +196,6 @@
             const email = document.getElementById('adminEmail').value;
             if(!email) return alert("Masukkan emel!");
             await hantarData({ action: "jana_laporan", emailPenerima: email });
-        }
-
-        async function hantarData(data) {
-            document.getElementById('status').innerText = "Memproses...";
-            try {
-                const r = await fetch(API_URL, { method: "POST", body: JSON.stringify(data) });
-                alert(await r.text());
-                location.reload();
-            } catch (e) { alert("Gagal!"); }
         }
 
         loadData();
